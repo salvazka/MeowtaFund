@@ -1,6 +1,6 @@
 # Pizza Box
+A simple IOTA dApp to understand about Move object concept with pizza and pizza box analogy.
 
-Complete guide for deploying and customizing your IOTA dApp.
 
 ## 📍 Contract Address
 
