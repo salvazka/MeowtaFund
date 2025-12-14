@@ -11,68 +11,39 @@ import { Transaction } from "@iota/iota-sdk/transactions"
 import type { IotaObjectData } from "@iota/iota-sdk/client"
 import { TESTNET_PACKAGE_ID } from "@/lib/config"
 
-// ============================================================================
-// CONTRACT CONFIGURATION
-// ============================================================================
-
+// CONFIG
 const PACKAGE_ID = TESTNET_PACKAGE_ID
-export const CONTRACT_MODULE = "pizza"
+export const CONTRACT_MODULE = "crowdfunding" // Sesuaikan nama module
+
 export const CONTRACT_METHODS = {
-  COOK: "cook",
+  DONATE: "donate",
+  WITHDRAW: "withdraw_funds",
 } as const
 
-// ============================================================================
-// DATA EXTRACTION
-// ============================================================================
-
-function getObjectFields(data: IotaObjectData): { owner: string } | null {
-  if (data.content?.dataType !== "moveObject") {
-    console.log("Data is not a moveObject:", data.content?.dataType)
-    return null
-  }
-
+// HELPERS
+function getObjectFields(data: IotaObjectData): { owner: string; balance?: string } | null {
+  if (data.content?.dataType !== "moveObject") return null
   const fields = data.content.fields as any
-  if (!fields) {
-    console.log("No fields found in object data")
-    return null
-  }
-
-  console.log("Object fields structure:", JSON.stringify(fields, null, 2))
-
+  if (!fields) return null
+  
   const owner = data.owner && typeof data.owner === "object" && "AddressOwner" in data.owner
     ? String(data.owner.AddressOwner)
-    : ""
-
-  return {
-    owner,
-  }
+    : "Shared"
+    
+  const balance = fields.balance ? String(fields.balance) : "0"
+  return { owner, balance }
 }
 
-// ============================================================================
-// MAIN HOOK
-// ============================================================================
-
-export interface ContractData {
-  owner: string
-}
-
-export interface ContractState {
-  isLoading: boolean
-  isPending: boolean
-  isConfirming: boolean
-  isConfirmed: boolean
-  hash: string | undefined
-  error: Error | null
-}
-
+// TYPES
 export interface ContractActions {
-  cook: (pepperoni: number, sausage: number, cheese: number, onion: number, chives: number) => Promise<void>
+  donate: (amount: string, fundId: string) => Promise<void>
+  withdraw: (adminCapId: string, fundId: string) => Promise<void>
   clearObject: () => void
 }
 
+// MAIN HOOK
 export const useContract = () => {
   const currentAccount = useCurrentAccount()
-  const address = currentAccount?.address
   const iotaClient = useIotaClient()
   const { mutate: signAndExecute, isPending } = useSignAndExecuteTransaction()
   const [objectId, setObjectId] = useState<string | null>(null)
@@ -82,122 +53,69 @@ export const useContract = () => {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const hash = window.location.hash.slice(1)
-      if (hash) setObjectId(hash)
+      const h = window.location.hash.slice(1)
+      if (h) setObjectId(h)
     }
   }, [])
 
-  const { data, isPending: isFetching, error: queryError, refetch } = useIotaClientQuery(
-    "getObject",
-    {
-      id: objectId!,
-      options: { showContent: true, showOwner: true },
-    },
-    {
-      enabled: !!objectId,
-    }
+  const { data, isPending: isFetching, error: queryError } = useIotaClientQuery("getObject", 
+    { id: objectId!, options: { showContent: true, showOwner: true } }, 
+    { enabled: !!objectId }
   )
 
   const fields = data?.data ? getObjectFields(data.data) : null
-  const isOwner = fields?.owner.toLowerCase() === address?.toLowerCase()
 
-  const objectExists = !!data?.data
-  const hasValidData = !!fields
-
-  const cook = async (pepperoni: number, sausage: number, cheese: number, onion: number, chives: number) => {
+  // 1. DONATE FUNCTION
+  const donate = async (amount: string, fundId: string) => {
     try {
-      setIsLoading(true)
-      setTransactionError(null)
-      setHash(undefined)
+      setIsLoading(true); setTransactionError(null); setHash(undefined)
       const tx = new Transaction()
+      const amountInMist = Number(amount) * 1_000_000_000;
+      
+      const [coinPayment] = tx.splitCoins(tx.gas, [tx.pure.u64(amountInMist)])
+      
       tx.moveCall({
-        arguments: [
-          tx.pure.u16(pepperoni),
-          tx.pure.u16(sausage),
-          tx.pure.u16(cheese),
-          tx.pure.u16(onion),
-          tx.pure.u16(chives),
-        ],
-        target: `${PACKAGE_ID}::${CONTRACT_MODULE}::${CONTRACT_METHODS.COOK}`,
+        target: `${PACKAGE_ID}::${CONTRACT_MODULE}::${CONTRACT_METHODS.DONATE}`,
+        arguments: [tx.object(fundId), coinPayment],
       })
 
-      signAndExecute(
-        { transaction: tx },
-        {
+      signAndExecute({ transaction: tx }, {
           onSuccess: async ({ digest }) => {
-            setHash(digest)
-            try {
-              const { effects } = await iotaClient.waitForTransaction({
-                digest,
-                options: { showEffects: true },
-              })
-              const newObjectId = effects?.created?.[0]?.reference?.objectId
-              if (newObjectId) {
-                setObjectId(newObjectId)
-                if (typeof window !== "undefined") {
-                  window.location.hash = newObjectId
-                }
-                setIsLoading(false)
-              } else {
-                setIsLoading(false)
-                console.warn("No object ID found in transaction effects")
-              }
-            } catch (waitError) {
-              console.error("Error waiting for transaction:", waitError)
-              setIsLoading(false)
-            }
+            setHash(digest); await iotaClient.waitForTransaction({ digest }); setIsLoading(false)
           },
           onError: (err) => {
-            const error = err instanceof Error ? err : new Error(String(err))
-            setTransactionError(error)
-            console.error("Error:", err)
-            setIsLoading(false)
+            setTransactionError(err instanceof Error ? err : new Error(String(err))); setIsLoading(false)
           },
-        }
-      )
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err))
-      setTransactionError(error)
-      console.error("Error cooking pizza:", err)
-      setIsLoading(false)
-    }
+      })
+    } catch (err) { console.error(err); setIsLoading(false) }
   }
 
-  const contractData: ContractData | null = fields
-    ? {
-      owner: fields.owner,
-    }
-    : null
+  // 2. WITHDRAW FUNCTION
+  const withdraw = async (adminCapId: string, fundId: string) => {
+    try {
+      setIsLoading(true); setTransactionError(null); setHash(undefined)
+      const tx = new Transaction()
 
-  const clearObject = () => {
-    setObjectId(null)
-    setTransactionError(null)
-    if (typeof window !== "undefined") {
-      window.location.hash = ""
-    }
-  }
+      tx.moveCall({
+        target: `${PACKAGE_ID}::${CONTRACT_MODULE}::${CONTRACT_METHODS.WITHDRAW}`,
+        arguments: [tx.object(adminCapId), tx.object(fundId)],
+      })
 
-  const actions: ContractActions = {
-    cook,
-    clearObject,
-  }
-
-  const contractState: ContractState = {
-    isLoading: (isLoading && !objectId) || isPending || isFetching,
-    isPending,
-    isConfirming: false,
-    isConfirmed: !!hash && !isLoading && !isPending,
-    hash,
-    error: queryError || transactionError,
+      signAndExecute({ transaction: tx }, {
+          onSuccess: async ({ digest }) => {
+            setHash(digest); await iotaClient.waitForTransaction({ digest }); setIsLoading(false)
+          },
+          onError: (err) => {
+            setTransactionError(err instanceof Error ? err : new Error(String(err))); setIsLoading(false)
+          },
+      })
+    } catch (err) { console.error(err); setIsLoading(false) }
   }
 
   return {
-    data: contractData,
-    actions,
-    state: contractState,
-    objectId,
-    isOwner,
-    objectExists,
-    hasValidData,
+    data: fields ? { owner: fields.owner, balance: fields.balance } : null,
+    actions: { donate, withdraw, clearObject: () => setObjectId(null) },
+    state: { isLoading: isLoading || isPending || isFetching, hash, error: queryError || transactionError },
+    objectId
   }
 }
