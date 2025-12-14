@@ -1,64 +1,90 @@
-# Pizza Box
-A simple IOTA dApp to understand about Move object concept with pizza and pizza box analogy.
+<img width="1366" height="768" alt="Cuplikan layar 2025-12-14 173159" src="https://github.com/user-attachments/assets/409eb523-a006-4e99-b259-bf1b21ac4ada" />
+<img width="1366" height="768" alt="Cuplikan layar 2025-12-14 173106" src="https://github.com/user-attachments/assets/6ac4738e-1536-44af-a413-f52955870624" />
+<img width="1366" height="768" alt="Cuplikan layar 2025-12-14 173127" src="https://github.com/user-attachments/assets/94cf1910-1fca-481b-95b7-ee82f8115b26" />
+🐾 MeowtaFund
+
+A gamified crowdfunding platform on IOTA Blockchain to help stray cats. Users donate IOTA and mint unique, randomized Cat NFTs with funny names and valuations.
+
+📍 Contract Address
+
+Network: IOTA Testnet
+
+Package ID: 0xf9706e190abe57f0b1b5afc407d95111a32e2ffbcff7830db792c3691270235c
+Explorer: View on IotaScan
+
+🚀 Getting Started
+
+Follow these steps to run the project locally on your machine.
+
+1. Install Dependencies
+
+npm install --legacy-peer-deps
 
 
-## 📍 Contract Address
+2. Run Development Server
 
-**Network**: Testnet
-**Package ID**: `0x60cc7119c2418cd870138e9df1acd0f36bafd760a524b532575cdef1911d23cb`
-**Explorer**: [View on Explorer](https://iotascan.com/testnet/object/0x60cc7119c2418cd870138e9df1acd0f36bafd760a524b532575cdef1911d23cb/contracts)
+npm run dev
 
-## 🚀 Getting Started
 
-1. **Install dependencies:**
-   ```bash
-   npm install --legacy-peer-deps
-   ```
+3. Open App
 
-2. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
+Open http://localhost:3000 in your browser.
 
-3. **Open [http://localhost:3000](http://localhost:3000)** in your browser
+📝 How to Deploy Your Own Contract
 
-## 📝 Next Steps
+If you want to modify the logic (e.g. change Gacha rates or names), follow these steps:
 
-### 1. Deploy Your Move Contract
+1. Build & Publish
 
-```bash
-cd contract/<your-project-name>
+Navigate to the contract folder and deploy to IOTA Testnet:
+
+cd contract/pizza_box
 iota move build
-iota client publish
-```
-
-Then manually copy the package ID and update `lib/config.ts`:
-
-```typescript
-export const TESTNET_PACKAGE_ID = "0xYOUR_PACKAGE_ID"
-```
-
-### 2. Customize Your dApp
-- Adjust `Provider.tsx` for the default environment of your dApp.
-- Adjust `useContracts.ts` for methods to interact with your contract. 
-- Adjust `components/sample.tsx` to customize how your dApp looks.
+iota client publish --gas-budget 100000000
 
 
-## 🔧 Advanced Configuration
+2. Update Configuration
 
-### Network Configuration
+After publishing, you will get a transaction log in your terminal. Copy the new Object IDs and update lib/config.ts:
 
-Edit `lib/config.ts` to configure different networks:
+// Copy from "Published Objects" -> PackageID
+export const TESTNET_PACKAGE_ID = "0xYOUR_NEW_PACKAGE_ID"
 
-```typescript
-export const TESTNET_PACKAGE_ID = "0x..."
-export const DEVNET_PACKAGE_ID = "0x..."
-export const MAINNET_PACKAGE_ID = "0x..."
-```
+// Copy from "Created Objects" -> ObjectType ending in ::CharityFund (Owner: Shared)
+export const CHARITY_FUND_ID = "0xYOUR_NEW_FUND_ID"
 
-## 📚 Additional Resources
+// Copy from "Created Objects" -> ObjectType ending in ::AdminCap (Owner: Your Address)
+export const ADMIN_CAP_ID = "0xYOUR_NEW_ADMIN_CAP_ID"
 
-- [IOTA Documentation](https://wiki.iota.org/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Move Language Documentation](https://move-language.github.io/move/)
 
+3. Restart Server
+
+Restart your local server (Ctrl+C -> npm run dev) to apply changes.
+
+🌟 Key Features
+
+Gamified Donation: Donate IOTA to get a collectible NFT.
+
+Common (< 10 IOTA): Get a cute Pixel Cat.
+
+Rare (≥ 10 IOTA): Get a majestic Pixel Lion.
+
+On-Chain Randomness:
+
+Funny Names: Generates names like "Sir Whiskers the Lasagna Lover #42".
+
+Dynamic Valuation: Each NFT has a random value range stored on-chain.
+
+Social Proof: Live ticker showing recent donations.
+
+Transparency: Direct links to verify contracts and transactions on IotaScan.
+
+📚 Tech Stack
+
+IOTA Blockchain (Testnet)
+
+Next.js 14 (Frontend)
+
+Move Language (Smart Contract)
+
+[Tailwind CSS](https://tailwindcss.
